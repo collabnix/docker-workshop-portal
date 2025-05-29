@@ -1,0 +1,47 @@
+{
+  "name": "docker-workshop-portal",
+  "version": "2.0.0",
+  "description": "Interactive Docker Workshop Portal with MCP Integration",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx http-server . -p 8000 -o",
+    "build": "npm run optimize",
+    "optimize": "npx html-minifier --collapse-whitespace --remove-comments --minify-css --minify-js index.html -o dist/index.html",
+    "deploy": "gh-pages -d .",
+    "test": "npx html-validate index.html",
+    "lint": "npx eslint assets/js/ --fix"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/collabnix/docker-workshop-portal.git"
+  },
+  "keywords": [
+    "docker",
+    "workshop",
+    "containers",
+    "mcp",
+    "education",
+    "training",
+    "hands-on"
+  ],
+  "author": {
+    "name": "Ajeet Singh Raina",
+    "email": "ajeetraina@gmail.com",
+    "url": "https://www.collabnix.com"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/collabnix/docker-workshop-portal/issues"
+  },
+  "homepage": "https://collabnix.github.io/docker-workshop-portal",
+  "devDependencies": {
+    "eslint": "^8.0.0",
+    "html-minifier": "^4.0.0",
+    "html-validate": "^7.0.0",
+    "http-server": "^14.0.0",
+    "gh-pages": "^4.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
