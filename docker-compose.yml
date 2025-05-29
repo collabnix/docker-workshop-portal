@@ -1,0 +1,168 @@
+version: '3.8'
+
+services:
+  # Main workshop portal
+  workshop-portal:
+    build:
+      context: .
+      target: development
+    container_name: docker-workshop-portal
+    ports:
+      - "8000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - CHOKIDAR_USEPOLLING=true
+    restart: unless-stopped
+    networks:
+      - workshop-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.workshop.rule=Host(`workshop.localhost`)"
+      - "traefik.http.services.workshop.loadbalancer.server.port=3000"
+
+  # Production build for testing
+  workshop-production:
+    build:
+      context: .
+      target: production
+    container_name: docker-workshop-prod
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+    networks:
+      - workshop-network
+    profiles:
+      - production
+
+  # Optional: Database for user progress tracking
+  mongodb:
+    image: mongo:6-alpine
+    container_name: workshop-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=workshop123
+      - MONGO_INITDB_DATABASE=workshop
+    restart: unless-stopped
+    networks:
+      - workshop-network
+    profiles:
+      - database
+
+  # Optional: Redis for session management
+  redis:
+    image: redis:7-alpine
+    container_name: workshop-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    networks:
+      - workshop-network
+    profiles:
+      - cache
+
+  # Optional: Backend API (Node.js/Express)
+  workshop-api:
+    image: node:18-alpine
+    container_name: workshop-api
+    working_dir: /app
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./api:/app
+    command: sh -c "npm install && npm run dev"
+    environment:
+      - NODE_ENV=development
+      - MONGODB_URI=mongodb://admin:workshop123@mongodb:27017/workshop?authSource=admin
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - mongodb
+      - redis
+    restart: unless-stopped
+    networks:
+      - workshop-network
+    profiles:
+      - api
+
+  # Reverse proxy for local development
+  traefik:
+    image: traefik:v3.0
+    container_name: workshop-traefik
+    ports:
+      - "80:80"
+      - "8080:8080"  # Traefik dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+    networks:
+      - workshop-network
+    profiles:
+      - proxy
+
+  # Optional: Monitoring with Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: workshop-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    networks:
+      - workshop-network
+    profiles:
+      - monitoring
+
+  # Optional: Grafana for metrics visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: workshop-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    restart: unless-stopped
+    networks:
+      - workshop-network
+    profiles:
+      - monitoring
+
+networks:
+  workshop-network:
+    driver: bridge
+    name: workshop-network
+
+volumes:
+  mongodb_data:
+    name: workshop_mongodb_data
+  redis_data:
+    name: workshop_redis_data
+  prometheus_data:
+    name: workshop_prometheus_data
+  grafana_data:
+    name: workshop_grafana_data
+
+# Development commands:
+# docker-compose up workshop-portal                    # Start development server
+# docker-compose --profile production up              # Start production build
+# docker-compose --profile database up                # Include database
+# docker-compose --profile api up                     # Include backend API
+# docker-compose --profile monitoring up              # Include monitoring stack
+# docker-compose --profile proxy up                   # Include reverse proxy
